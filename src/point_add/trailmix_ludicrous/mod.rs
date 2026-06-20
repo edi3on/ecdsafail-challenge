@@ -126,6 +126,7 @@ struct Sched {
 }
 
 thread_local!(static SCHED: RefCell<Sched> = RefCell::new(Sched::default()));
+thread_local!(static CURRENT_COUT_CALL: std::cell::Cell<usize> = std::cell::Cell::new(usize::MAX));
 
 /// Read the next entry of a `(values, cursor)` slot, returning `exhausted` past
 /// the end (a sentinel meaning "no schedule constraint": full headroom).
@@ -151,7 +152,19 @@ fn sub_delta(v: usize, name: &str) -> usize {
 }
 
 fn next_gcd_k() -> usize { SCHED.with(|s| step(&mut s.borrow_mut().gcd_k, usize::MAX)) }
-fn next_cout_k() -> usize { SCHED.with(|s| sub_delta(step(&mut s.borrow_mut().cout_k, usize::MAX), "TLM_COUT_K_DELTA")) }
+fn next_cout_k() -> usize {
+    SCHED.with(|s| {
+        let mut s = s.borrow_mut();
+        let call = s.cout_k.1;
+        let k = sub_delta(step(&mut s.cout_k, usize::MAX), "TLM_COUT_K_DELTA");
+        CURRENT_COUT_CALL.with(|c| c.set(call));
+        k
+    })
+}
+
+pub(super) fn current_cout_call_index() -> usize {
+    CURRENT_COUT_CALL.with(|c| c.get())
+}
 fn next_fold() -> i32 {
     SCHED.with(|s| {
         let v = step(&mut s.borrow_mut().fold, i32::MAX);

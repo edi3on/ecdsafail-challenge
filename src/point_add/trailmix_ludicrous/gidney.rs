@@ -328,15 +328,24 @@ fn searched_cout_layout(n: usize, k: usize) -> Option<AdaptiveLayout> {
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or(1);
-    if margin == 0
-        && std::env::var("TLM_COUT_LAYOUT_FORCE_M1_KS")
-            .ok()
-            .map(|s| {
-                s.split(',')
-                    .filter_map(|part| part.trim().parse::<usize>().ok())
-                    .any(|force_k| force_k == k)
-            })
-            .unwrap_or(false)
+    let force_call = std::env::var("TLM_COUT_LAYOUT_FORCE_M1_CALLS")
+        .ok()
+        .map(|s| {
+            let call = super::current_cout_call_index();
+            s.split(',')
+                .filter_map(|part| part.trim().parse::<usize>().ok())
+                .any(|force_call| force_call == call)
+        })
+        .unwrap_or(false);
+    let force_k = std::env::var("TLM_COUT_LAYOUT_FORCE_M1_KS")
+        .ok()
+        .map(|s| {
+            s.split(',')
+                .filter_map(|part| part.trim().parse::<usize>().ok())
+                .any(|force_k| force_k == k)
+        })
+        .unwrap_or(false);
+    if margin == 0 && (force_call || force_k)
     {
         margin = 1;
     }
