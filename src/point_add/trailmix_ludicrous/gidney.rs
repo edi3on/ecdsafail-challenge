@@ -349,6 +349,10 @@ fn searched_cout_layout(n: usize, k: usize) -> Option<AdaptiveLayout> {
     {
         margin = 1;
     }
+    let tie_last = std::env::var("TLM_COUT_LAYOUT_TIE")
+        .ok()
+        .as_deref()
+        == Some("last");
     let mut best: Option<(usize, AdaptiveLayout)> = None;
     for c in 1..=n {
         for plain_len in 1..=n {
@@ -363,7 +367,7 @@ fn searched_cout_layout(n: usize, k: usize) -> Option<AdaptiveLayout> {
             let cost = 2 * n + chunked_len + nchunks + 1;
             let layout = AdaptiveLayout { c, chunked_len, plain_len };
             match best {
-                Some((best_cost, _)) if best_cost <= cost => {}
+                Some((best_cost, _)) if best_cost < cost || (!tie_last && best_cost == cost) => {}
                 _ => best = Some((cost, layout)),
             }
         }
