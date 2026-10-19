@@ -10,7 +10,7 @@ mod truth_simplify;
 /// Each bit is encoded as an X/X identity pair on qubit 0 or 1, so changing
 /// the nonce changes only the challenge hash, never the circuit semantics,
 /// qubit peak, or Toffoli count.
-const LILYPAD_TAIL_NONCE: u64 = 37;
+const LILYPAD_TAIL_NONCE: u64 = 8;
 
 fn append_lilypad_nonce_tail(ops: &mut Vec<crate::circuit::Op>, nonce: u64) {
     use crate::circuit::{OperationType, QubitId};
