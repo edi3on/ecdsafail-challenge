@@ -72,12 +72,12 @@ fn tail_k0() -> usize {
     if l3_enabled() { 0 } else { 48 }
 }
 
-/// Circuit peak (the inverse walk needs 936); the modular routines take every qubit below it as a carry pool. 949
-/// gives the inverse walk's cofactor adds enough pool for a chunk plan on every tick (best score of the sweep).
-pub const PEAK0: u64 = if super::LILYPAD_G { 960 } else { 892 };
-/// Peak for the shell's modular-routine carry pools. Above ~950 the shell's live-768/816 phases get rooms past
-/// ~180/130 lanes and a phase-garbage channel appears (measured), so the shell is held below the walk's peak.
-pub const PEAK_MS: u64 = if super::LILYPAD_G { 960 } else { 892 };
+/// Q955 Pareto tradeoff: walk and square use the source-pinned carry-pool cap.
+/// Arithmetic precision, walk schedule and ring widths remain inherited.
+pub const PEAK0: u64 = if super::LILYPAD_G { 955 } else { 892 };
+/// The shell uses the same cap and retains the Q960 parent's paired-debt
+/// boundary correction in modp_ft.rs. This is not an all-input exactness claim.
+pub const PEAK_MS: u64 = if super::LILYPAD_G { 955 } else { 892 };
 pub fn peak() -> u64 {
     PEAK0
 }
