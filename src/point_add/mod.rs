@@ -291,7 +291,7 @@ fn install_skywalk_submission_recipe() {
         ("HEO_R2D", "375"),
         ("HEO_R2M", "370"),
         ("HEO_CARRY_SEED", "fd"),
-        ("HEO_PIN_PP_WALK_MAX_QUBITS", "1112"),
+        ("HEO_PIN_PP_WALK_MAX_QUBITS", "1120"),
         ("HEO_LT0", "1"),
         ("HEO_BW", "inv"),
         ("HEO_LT0_MUL", "1"),
