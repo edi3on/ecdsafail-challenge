@@ -15,6 +15,10 @@ use super::builder::{B, G};
 use crate::circuit::{QubitId, NO_QUBIT};
 
 #[cfg(test)]
+#[path = "first_zero_carry_experiment.rs"]
+mod first_zero_carry_experiment;
+
+#[cfg(test)]
 #[path = "q798_shared_mask_tests.rs"]
 mod masked_fused_tests;
 

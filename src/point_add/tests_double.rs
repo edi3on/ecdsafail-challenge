@@ -1,5 +1,8 @@
 //! froghop-double tests: masked ladders, then the slot against refmodel_double.
 
+#[path = "carry_gap_tests.rs"]
+mod carry_gap_tests;
+
 use super::builder::B;
 use super::mask::*;
 use super::refmodel_double::N;
