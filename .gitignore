@@ -1,0 +1,6 @@
+/target
+.claude/
+score.*
+.autoresearch
+**/.DS_Store
+ops.bin

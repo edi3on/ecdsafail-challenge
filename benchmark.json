@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "name": "ecadd-challenge-test",
+  "description": "Optimize the qubit-toffoli product for a reversible circuit that adds a quantum elliptic curve point to a classical elliptic curve point.",
+  "category": "rust",
+  "direction": "-",
+  "editablePaths": ["src/point_add"],
+  "setupCommand": ["bash", "-lc", "./setup.sh"],
+  "benchmarkCommand": ["bash", "-lc", "./benchmark.sh"],
+  "scorePath": "score.json",
+  "runner": {
+    "provider": "github-actions",
+    "workflow": "benchmark.yml"
+  }
+}
