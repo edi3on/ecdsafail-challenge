@@ -9,6 +9,8 @@ pub mod pointadd_double;
 pub mod refmodel_double;
 #[cfg(test)]
 mod tests_double;
+#[cfg(test)]
+mod maskless_experiment;
 
 use crate::circuit::Op;
 

@@ -48,6 +48,7 @@ impl B {
     }
 
     // ---------------------------------------------------------------- qubits
+    #[track_caller]
     pub fn alloc(&mut self) -> QubitId {
         let id = if let Some(&q) = self.free_q.iter().next() {
             self.free_q.remove(&q);
@@ -61,17 +62,32 @@ impl B {
             self.peak = self.live;
             self.peak_op = self.ops.len();
         }
+        if std::env::var_os("FH_LEDGER").is_some() {
+            let loc = std::panic::Location::caller();
+            eprintln!("LQ_ALLOC {} {} {} {}:{}", id, self.live, self.ops.len(), loc.file(), loc.line());
+        }
         QubitId(id)
     }
+    #[track_caller]
     pub fn alloc_n(&mut self, n: usize) -> Vec<QubitId> {
-        (0..n).map(|_| self.alloc()).collect()
+        let mut out = Vec::with_capacity(n);
+        for _ in 0..n {
+            out.push(self.alloc());
+        }
+        out
     }
     /// Release a qubit that is |0> on every shot.
+    #[track_caller]
     pub fn free(&mut self, q: QubitId) {
         assert!(self.rec.is_empty(), "free inside a recording");
         assert!(self.free_q.insert(q.0), "double free q{}", q.0);
         self.live -= 1;
+        if std::env::var_os("FH_LEDGER").is_some() {
+            let loc = std::panic::Location::caller();
+            eprintln!("LQ_FREE {} {} {} {}:{}", q.0, self.live, self.ops.len(), loc.file(), loc.line());
+        }
     }
+    #[track_caller]
     pub fn free_n(&mut self, qs: &[QubitId]) {
         for &q in qs {
             self.free(q);
@@ -199,12 +215,17 @@ impl B {
         self.raw(Op { kind: OperationType::Hmr, q_target: q, c_condition: NO_BIT, c_target: c, ..Op::empty() });
     }
     /// Take a specific free qubit back out of the pool.
+    #[track_caller]
     pub fn acquire(&mut self, q: QubitId) {
         assert!(self.free_q.remove(&q.0), "acquire of a busy qubit q{}", q.0);
         self.live += 1;
         if self.live > self.peak {
             self.peak = self.live;
             self.peak_op = self.ops.len();
+        }
+        if std::env::var_os("FH_LEDGER").is_some() {
+            let loc = std::panic::Location::caller();
+            eprintln!("LQ_ACQUIRE {} {} {} {}:{}", q.0, self.live, self.ops.len(), loc.file(), loc.line());
         }
     }
     pub fn fresh_bits(&mut self, n: usize) -> Vec<BitId> {

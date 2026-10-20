@@ -62,7 +62,14 @@ fn div_forward(b: &mut B, lay: &LayDouble, xq: &[QubitId], refl: QubitId, dirty:
     let mut f = FhDouble::alloc(b, d, v, lay, refl, dirty.to_vec());
     f.init(b, lay);
     ck(b, "div_forward pre-traversal");
+    if std::env::var_os("FH_LEDGER").is_some() {
+        eprintln!("LQ_OWN d={:?} v={:?} pi={:?} dep={:?} bq={:?} phase={:?} par={:?} pool={:?} dirty={:?}",
+            f.d, f.v, f.pi, f.dep, f.bq, [f.p0,f.p1,f.p2], f.par, f.pool, f.dirty);
+    }
     let maps = f.forward(b, lay);
+    if std::env::var_os("FH_LEDGER").is_some() {
+        eprintln!("LQ_SCRATCH_FORWARD {:?}", f.peaks);
+    }
     ck(b, "div_forward post-traversal");
     final_consts(b, &f);
     // home V: V-frame lane u sits at physical lane u + pi, pi in {0, 1}
@@ -142,6 +149,9 @@ fn div_inverse(b: &mut B, lay: &LayDouble, mut dv: Div, dirty: &[QubitId]) {
     b.play(&r, true);
     final_consts(b, f);
     f.inverse(b, lay, &dv.maps);
+    if std::env::var_os("FH_LEDGER").is_some() {
+        eprintln!("LQ_SCRATCH_INVERSE {:?}", f.peaks);
+    }
     f.init(b, lay); // clears D's constants, b, pi, AL flag
     b.free_n(&f.d);
     for j in 0..w {
