@@ -74,10 +74,10 @@ fn tail_k0() -> usize {
 
 /// Circuit peak (the inverse walk needs 936); the modular routines take every qubit below it as a carry pool. 949
 /// gives the inverse walk's cofactor adds enough pool for a chunk plan on every tick (best score of the sweep).
-pub const PEAK0: u64 = if super::LILYPAD_G { 930 } else { 892 };
+pub const PEAK0: u64 = if super::LILYPAD_G { 928 } else { 892 };
 /// Peak for the shell's modular-routine carry pools. Above ~950 the shell's live-768/816 phases get rooms past
 /// ~180/130 lanes and a phase-garbage channel appears (measured), so the shell is held below the walk's peak.
-pub const PEAK_MS: u64 = if super::LILYPAD_G { 930 } else { 892 };
+pub const PEAK_MS: u64 = if super::LILYPAD_G { 928 } else { 892 };
 pub fn peak() -> u64 {
     PEAK0
 }
