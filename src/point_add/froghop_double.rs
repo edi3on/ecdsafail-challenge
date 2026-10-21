@@ -726,7 +726,7 @@ impl FhDouble {
             let pp = pl.get_n(np);
             let pihi = jw.min(lv);
             // decoder prefixes: shared when the two windows are disjoint, split otherwise
-            let (pa, pre) = if p1lo < lv && pihi > p1lo { (pp[..np / 2].to_vec(), pp[np / 2..].to_vec()) }
+            let (pa, pre) = if p1lo < lv && pihi > p1lo { let k = if np == 3 { 0 } else { np / 2 }; (pp[..k].to_vec(), pp[k..].to_vec()) }
                             else { (pp.clone(), pp.clone()) };
             let t: Vec<QubitId> = self.d[0..lv].to_vec();
             let s: Vec<QubitId> = self.v[0..lv].to_vec();
