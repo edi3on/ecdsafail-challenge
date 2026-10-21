@@ -667,3 +667,153 @@ fn modp_double_fold_dirty_carry() {
         eprintln!("fold lo {lo}: ok ({} T)", b.tof);
     }
 }
+
+// Append inside the existing tests_double.rs module; no new imports required.
+#[test]
+fn p1_short_prefix_1_4_matches_2_3_and_bit_model() {
+    const L: usize = 72;
+    const HHI: usize = 34; // includes parity skips and h queries beyond the 4-bit range
+    let all = (N::from(1u64) << L) - N::from(1u64);
+    // (boundary window start, boundary affine offset): overlap, touch, disjoint.
+    // The latter two include negative queries; overlap includes queries >= 64.
+    for &(blo, a) in &[(12usize, -5isize), (34, -36), (40, -42)] {
+        for pk in 0..2usize {
+            let mut reference = None;
+            for split in [2usize, 1] {
+                let mut b = B::new();
+                let t = b.alloc_n(L);
+                let s = b.alloc_n(L);
+                let h = b.alloc_n(4); // production PIB = 4, h = (pi - pk) / 2
+                let bv = b.alloc_n(6); // production BB = 6
+                let c0 = b.alloc();
+                let f = b.alloc();
+                let tmp = b.alloc(); // exactly one clean cell/query temp; gf aliases it
+                let pp = b.alloc_n(5);
+                let dirty = b.alloc_n(4);
+                let g = b.alloc();
+                let flag = b.alloc();
+                let overlap = blo < HHI;
+                let (pa, pb) = if overlap {
+                    (pp[..split].to_vec(), pp[split..].to_vec())
+                } else {
+                    (pp.clone(), pp.clone()) // production shares all five when not overlapping
+                };
+                let srcs = vec![
+                    Src { lo: 0, hi: HHI, v: h.clone(), a: 0, d: 1,
+                          pre: pa, late: false, hk: Some(pk) },
+                    Src { lo: blo, hi: L, v: bv.clone(), a, d: 1,
+                          pre: pb, late: false, hk: None },
+                ];
+                let sc = Mscr { f, t: tmp, gf: tmp, chain: pp.clone(), dirty: dirty.clone() };
+                let ld = Lad { t: &t, s: &s, c0, srcs: &srcs, f0: false,
+                               cmpl: true, sc: &sc, keep_f: true };
+                let ru = mup(&mut b, &ld);
+                let rd = mdown(&mut b, &ld, Some(g));
+                let ct = top_carry(&ld);
+                b.play(&ru, false);
+                let top = b.ops.len();
+                b.begin();
+                // Borrow every prefix AND the cell temp between passes. Eight controls
+                // use all six clean temps. This is a synthetic flag write, not P1 dispatch.
+                let lits = [(h[0], false), (h[1], false), (h[2], false), (h[3], false),
+                            (bv[0], false), (bv[1], false), (g, false), (ct, false)];
+                let mut lent = pp.clone();
+                lent.push(tmp);
+                b.begin(); // exercise nested recording without retaining a full traversal
+                mc_xor(&mut b, &lits, flag, &lent, &dirty);
+                let flag_write = b.end();
+                b.play(&flag_write, false);
+                b.play(&rd, false);
+                let tail = b.end();
+                b.play(&tail, false);
+                let end = b.ops.len();
+                b.play(&tail, true);
+                b.play(&ru, true);
+                let nq = b.width() as usize;
+                assert!(nq < 256 && b.ops.len() < 100_000, "fixture unexpectedly expanded");
+
+                // Identical packed inputs for both splits. Every h value occurs four
+                // times; every boundary value occurs once (not their full Cartesian product).
+                let mut initial = vec![0u64; nq];
+                let mut expected = initial.clone();
+                let mut carries = 0u64;
+                let mut final_f = 0u64;
+                let mut rng = Rng::new(0x5041 + blo as u64 * 2 + pk as u64);
+                for k in 0..64 {
+                    let hv = k % 16;
+                    let bval = (5 * k + 4) % 64; // permutation, including coincident overlap toggles
+                    let gv = (k / 16) % 2; // both enables for every h value
+                    let mut tv = rng.below(L);
+                    let mut sv = rng.below(L);
+                    match k % 8 {
+                        0 | 7 => { tv = N::ZERO; sv = all; }
+                        1 => { tv = all; sv = N::ZERO; }
+                        2 => sv = tv,
+                        3 => { tv = N::from(1u64) << (L - 1); sv = N::from(1u64); }
+                        _ => {}
+                    }
+                    put(&mut initial, &t, k, &tv);
+                    put(&mut initial, &s, k, &sv);
+                    put(&mut initial, &h, k, &N::from(hv as u64));
+                    put(&mut initial, &bv, k, &N::from(bval as u64));
+                    initial[g.0 as usize] |= (gv as u64) << k;
+
+                    // Independent full integer equality and ordinary binary borrow.
+                    // No Src::rv/span, Dec, prefix controls or ladder gates are used.
+                    let mut mask = false;
+                    let mut borrow = false;
+                    let mut want = tv;
+                    for l in 0..L {
+                        if l < HHI && l == 2 * hv + pk { mask = !mask; }
+                        if l >= blo && bval as isize == a + l as isize { mask = !mask; }
+                        if (l < HHI || l >= blo) && !mask { continue; }
+                        let diff = tv.bit(l) as i8 - sv.bit(l) as i8 - borrow as i8;
+                        borrow = diff < 0;
+                        if gv == 1 && ((diff & 1) != 0) != tv.bit(l) {
+                            want ^= N::from(1u64) << l;
+                        }
+                    }
+                    carries |= (borrow as u64) << k;
+                    final_f |= (mask as u64) << k;
+                    put(&mut expected, &t, k, &want);
+                    put(&mut expected, &s, k, &sv);
+                    put(&mut expected, &h, k, &N::from(hv as u64));
+                    put(&mut expected, &bv, k, &N::from(bval as u64));
+                    expected[g.0 as usize] |= (gv as u64) << k;
+                    let fe = hv == 15 && bval & 3 == 3 && gv == 1 && borrow;
+                    expected[flag.0 as usize] |= (fe as u64) << k;
+                }
+                assert_ne!(expected[flag.0 as usize], 0, "flag witness must be nonvacuous");
+                for &q in &dirty {
+                    let word = rng.next();
+                    initial[q.0 as usize] = word;
+                    expected[q.0 as usize] = word;
+                }
+                let up = run(&b.ops[..top], nq, &|w| w.copy_from_slice(&initial));
+                assert_eq!(up.phase, 0, "up phase blo={blo} pk={pk} split={split}");
+                assert_eq!(up.q[ct.0 as usize], carries, "full-equality carry oracle");
+                assert_eq!(up.q[f.0 as usize], final_f, "keep_f midpoint");
+                for &q in pp.iter().chain(std::iter::once(&tmp)) {
+                    assert_eq!(up.q[q.0 as usize], 0, "lent scratch q{} at top", q.0);
+                }
+                for &q in h.iter().chain(bv.iter()).chain(dirty.iter()).chain(std::iter::once(&g)) {
+                    assert_eq!(up.q[q.0 as usize], initial[q.0 as usize], "spectator at top q{}", q.0);
+                }
+                let out = run(&b.ops[..end], nq, &|w| w.copy_from_slice(&initial));
+                assert_eq!(out.phase, 0, "return phase blo={blo} pk={pk} split={split}");
+                // Whole-state equality also checks c0, f, temp, all five prefixes,
+                // selectors, conditional enable, dirty spectators, and the flag.
+                assert_eq!(out.q, expected, "bit model blo={blo} pk={pk} split={split}");
+                if let Some(ref old) = reference {
+                    assert_eq!(&out.q, old, "2+3 versus 1+4 blo={blo} pk={pk}");
+                } else {
+                    reference = Some(out.q.clone());
+                }
+                // Prepare the inverse input from the independent model, not the forward run.
+                let back = run(&b.ops[end..], nq, &|w| w.copy_from_slice(&expected));
+                assert_eq!(back.phase, 0, "inverse phase blo={blo} pk={pk} split={split}");
+                assert_eq!(back.q, initial, "inverse state blo={blo} pk={pk} split={split}");
+            }
+        }
+    }
+}
