@@ -15,6 +15,10 @@ use super::builder::{B, G};
 use crate::circuit::{QubitId, NO_QUBIT};
 
 #[cfg(test)]
+#[path = "first_one_carry_experiment.rs"]
+mod first_one_carry_experiment;
+
+#[cfg(test)]
 #[path = "first_zero_carry_experiment.rs"]
 mod first_zero_carry_experiment;
 

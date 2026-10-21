@@ -32,6 +32,12 @@ fn gap_image_native_ledger() {
         writeln!(w,"slot\tstage\tentry_op\tend_op\toperand_wires\tcommon_sample_zero_packed\tcommon_sample_zero_disjoint_operands\tcommon_sample_zero_untouched\tslot_entry_selector_zero_shots_at_stage\tfirst_selector_touch\tlast_selector_touch\tfirst_source_zero_shots\tfirst_source_wire").unwrap(); w
     });
     let mut rows = 0;
+    // H3 diagnostic only: real native stage-boundary metadata support census.
+    // This is finite corpus evidence, never a universal zero/loan certificate.
+    let mut meta_file = std::env::var("LQ_META_LEDGER_PATH").ok().map(|p| {
+        let mut w = std::io::BufWriter::new(std::fs::File::create(p).unwrap());
+        writeln!(w,"slot\tstage\tentry_op\tphase_tuple_mask\tp0_ones\tp1_ones\tp2_ones\tpi_min\tpi_max\tdep_min\tdep_max\tbq_min\tbq_max\tconstant_zero_meta\tconstant_one_meta").unwrap(); w
+    });
     let mut no_dropin = 0;
     let mut selector_nonzero = 0;
     for sigma in 0..lay.s {
@@ -56,6 +62,28 @@ fn gap_image_native_ledger() {
         let lc = row[3];
         let p2hi = row[4];
         let cut = if p2hi>lc {(WD-p2hi).saturating_sub(super::super::froghop_double::P3DEPTH)} else {0}.max(1);
+        if let Some(w) = meta_file.as_mut() {
+            for &(stage,start) in &f.marks {
+                let st = run(&b.ops[..start],nq,&|x|x.copy_from_slice(&words));
+                assert_eq!(st.phase,0,"stage prefix phase slot{sigma}/{stage}");
+                let mut tuple_mask=0u16;
+                let mut pi=Vec::new();let mut dep=Vec::new();let mut bq=Vec::new();
+                for k in 0..64 {
+                    let code=getb(&st.q,f.p0,k)+2*getb(&st.q,f.p1,k)+4*getb(&st.q,f.p2,k);
+                    tuple_mask |= 1<<code;
+                    pi.push(get(&st.q,&f.pi,k).to::<u64>());
+                    dep.push(get(&st.q,&f.dep,k).to::<u64>());
+                    bq.push(get(&st.q,&f.bq,k).to::<u64>());
+                }
+                let mut metadata=vec![("p0".to_string(),f.p0),("p1".to_string(),f.p1),("p2".to_string(),f.p2)];
+                for (name,qs) in [("pi",&f.pi),("dep",&f.dep),("bq",&f.bq)] {
+                    metadata.extend(qs.iter().enumerate().map(|(i,&q)|(format!("{name}{i}"),q)));
+                }
+                let zero=metadata.iter().filter(|(_,q)|st.q[q.0 as usize]==0).map(|(n,_)|n.clone()).collect::<Vec<_>>().join(",");
+                let one=metadata.iter().filter(|(_,q)|st.q[q.0 as usize]==u64::MAX).map(|(n,_)|n.clone()).collect::<Vec<_>>().join(",");
+                writeln!(w,"{sigma}\t{stage}\t{start}\t{tuple_mask}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{zero}\t{one}",st.q[f.p0.0 as usize].count_ones(),st.q[f.p1.0 as usize].count_ones(),st.q[f.p2.0 as usize].count_ones(),pi.iter().min().unwrap(),pi.iter().max().unwrap(),dep.iter().min().unwrap(),dep.iter().max().unwrap(),bq.iter().min().unwrap(),bq.iter().max().unwrap()).unwrap();
+            }
+        }
         for (stage,end) in [("S2","S3"),("S6","S7"),("S8","S9")] {
             if stage=="S2" && row[0]==0 || stage!="S2" && lc>=WD {continue;}
             let start = f.marks.iter().find(|x|x.0==stage).unwrap().1;
@@ -111,8 +139,35 @@ fn gap_image_native_ledger() {
         for j in 0..WD{assert_eq!(getb(&words,f.d[j],k) as u8,ed[j]);assert_eq!(getb(&words,f.v[j],k) as u8,ev[j]);}
     }
     if let Some(mut w)=file{w.flush().unwrap();}
+    if let Some(mut w)=meta_file{w.flush().unwrap();}
     assert!(no_dropin>0); // At least slot0 S2 must remain blocked.
     eprintln!("H2_GAP_SUMMARY slots={} shots=64 boundary_states={} stage_rows={rows} no_untouched_sample_zero={no_dropin} slot_entry_selector_nonzero_at_later_stage={selector_nonzero} physical_width={nq}",lay.s,lay.s*64);
+}
+
+#[test]
+fn sampled_metadata_zero_is_not_a_borrow_contract() {
+    // Deliberately chosen nonuniform input: ordinary random 64-shot census
+    // missed pi's high bit. This exact reference path reaches pi=16 without
+    // overflowing the inherited five-bit width. Do not borrow/narrow pi[4].
+    let x = (rmd::p() >> 16usize) + N::from(1u64);
+    let mut m = rmd::St::new(x);
+    let mut witness = None;
+    for slot in 0..32 {
+        if m.pi >= 16 { witness=Some((slot,m.pi,m.ph));break; }
+        m.fwd(slot);
+    }
+    let w=witness.expect("structured quotient must expose the fifth rotation bit");
+    assert!(w.1 < 32);
+    let lay=lay_double();let mut b=B::new();
+    let d=b.alloc_n(WD);let v=b.alloc_n(WD);let input=v[1..257].to_vec();let par=b.alloc();let dirty=b.alloc_n(256);
+    let mut f=FhDouble::alloc(&mut b,d,v,&lay,par,dirty);
+    f.init(&mut b,&lay);
+    for slot in 0..w.0 { f.slot(&mut b,&lay,slot); }
+    let result=run(&b.ops,b.width() as usize,&|words|{for k in 0..64{put(words,&input,k,&x);}});
+    assert_eq!(result.phase,0);
+    for k in 0..64 {assert_eq!(get(&result.q,&f.pi,k),N::from(w.1 as u64));}
+    assert_eq!(result.q[f.pi[4].0 as usize],u64::MAX,"native prefix must refute sampled high-bit zero");
+    eprintln!("H3_METADATA_COUNTEREXAMPLE input=(p>>16)+1 slot={} pi={} phase={:?}; native prefix confirms pi4=1 on64 identical witness copies; not a full native packet",w.0,w.1,w.2);
 }
 
 #[test]
