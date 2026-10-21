@@ -11,6 +11,8 @@ pub mod refmodel_double;
 mod tests_double;
 #[cfg(test)]
 mod maskless_experiment;
+#[cfg(test)]
+mod h4_s2_fusion_tests;
 
 use crate::circuit::Op;
 
