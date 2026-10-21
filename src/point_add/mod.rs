@@ -14,7 +14,7 @@ use crate::circuit::Op;
 
 pub const SCHED_DOUBLE: &str = include_str!("sched_double.txt");
 /// Fiat-Shamir nonce (number of identity X X pairs appended)
-pub const NONCE: usize = 1;
+pub const NONCE: usize = 0;
 
 pub fn layout_double() -> froghop_double::LayDouble {
     froghop_double::LayDouble::from_text(SCHED_DOUBLE, 24)
