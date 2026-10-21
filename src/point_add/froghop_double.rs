@@ -26,7 +26,7 @@ pub const DEPB: usize = 5;
 /// b (1..=256) is stored as the offset u = (b - 1) - base(sigma) mod 2^BB, base a per-slot classical constant
 pub const BB: usize = 6;
 pub const CNTB: usize = 8;
-pub const POOL_D: usize = 8;
+pub const POOL_D: usize = 9;
 thread_local! { pub static STEP: std::cell::Cell<&'static str> = std::cell::Cell::new(""); }
 /// P3 compares only lanes within this depth below the lowest shot boundary of the slot
 pub const P3DEPTH: usize = 20;
