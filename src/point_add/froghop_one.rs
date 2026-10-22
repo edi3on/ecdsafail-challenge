@@ -1065,9 +1065,12 @@ impl FhOne {
                 // be ^= (po | se) & cmp  (po, se exclusive)
                 if !extra_debt(b, be, mode, 9) {
                     b.x(ct);
-                    b.ccx(po, ct, be);
                     if odd {
-                        b.ccx(se, ct, be);
+                        b.cx(se, po);
+                        b.ccx(po, ct, be);
+                        b.cx(se, po);
+                    } else {
+                        b.ccx(po, ct, be);
                     }
                     b.x(ct);
                 }
