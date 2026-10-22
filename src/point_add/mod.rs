@@ -22,7 +22,7 @@ pub const SCHED_DOUBLE: &str = include_str!("sched_double.txt");
 pub const SCHED_ONE: &str = include_str!("sched_one.txt");
 /// Fiat-Shamir nonce (number of identity X X pairs appended). `FH_NONCE` overrides it for corpus measurements; the
 /// official build uses this value.
-pub const NONCE: usize = 1;
+pub const NONCE: usize = 0;
 /// Logical-AND carry qubits for the traversal ladders' ordinary lanes.
 pub const GPOOL: usize = 0;
 /// Traversal state: pi, k, flags, depth, b offset and [k != 0] (the quotient bits live in the register gaps; the layout
